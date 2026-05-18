@@ -11,6 +11,49 @@ if (!window.CHECKLIST_ITEMS) {
   };
 }
 
+// ========== FUNCIONES AUXILIARES LOCALES (por si no existen globalmente) ==========
+function localEscapeHtml(str) {
+  if (!str) return "";
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === "&") return "&amp;";
+    if (m === "<") return "&lt;";
+    if (m === ">") return "&gt;";
+    return m;
+  });
+}
+
+function localFormatDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const dia = String(d.getDate()).padStart(2,'0');
+  const mes = String(d.getMonth()+1).padStart(2,'0');
+  const anio = d.getFullYear();
+  const hora = String(d.getHours()).padStart(2,'0');
+  const min = String(d.getMinutes()).padStart(2,'0');
+  return `${dia}/${mes}/${anio} ${hora}:${min}`;
+}
+
+function localDurationBetween(start, end) {
+  if (!start || !end) return "";
+  const ms = new Date(end) - new Date(start);
+  const m = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
+}
+
+function localFormatearKm(num) {
+  if (num === undefined || num === null || isNaN(num)) return '';
+  return num.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+}
+
+// Usar funciones globales si existen, si no las locales
+const escapeHtml = window.escapeHtml || localEscapeHtml;
+const formatDateTime = window.formatDateTime || localFormatDateTime;
+const durationBetween = window.durationBetween || localDurationBetween;
+const formatearKm = window.formatearKm || localFormatearKm;
+
 // ========== FUNCIONES DE RENDERIZADO ==========
 function renderChecklistBadges(check) {
   if (!check) return "";
@@ -38,6 +81,7 @@ function renderChecklistGrid(type, currentValues) {
 }
 
 function mostrarInfoVehiculo(placa) {
+  if (!window.vehicles) return;
   const veh = window.vehicles.find(v => v.placa === placa);
   const infoDiv = document.getElementById("vehiculoInfo");
   if (!veh) { if (infoDiv) infoDiv.classList.add("hidden"); return; }
@@ -69,6 +113,7 @@ function mostrarInfoVehiculo(placa) {
   if (kmInput && typeof veh.km_actual === 'number') kmInput.value = formatearKm(veh.km_actual);
 }
 
+// ========== FUNCIÓN PRINCIPAL updateUI (autocontenida) ==========
 async function updateUI() {
   if (!window.trips) window.trips = [];
   const enRuta = window.trips.filter(t => t.status === "en_ruta");
@@ -82,7 +127,6 @@ async function updateUI() {
   const llegadasHoy = completados.filter(t => t.llegada && new Date(t.llegada).toDateString() === hoy).length;
   setStat("statHoy", llegadasHoy);
   
-  // Saldo total (si existe tabla, si no, 0)
   let saldoTotal = 0;
   try {
     const { data: saldos } = await supabaseClient.from('vehiculo_saldo_peaje').select('saldo');
@@ -91,35 +135,44 @@ async function updateUI() {
   setStat("statKm", `S/ ${saldoTotal.toFixed(2)}`);
   setStat("statTotal", window.trips.length);
   
-  // Panel en ruta
   const panelEnRuta = document.getElementById("panelEnRuta");
   if (panelEnRuta) {
     if (!enRuta.length) {
       panelEnRuta.innerHTML = `<div class="col-span-full text-center py-12 border border-dashed rounded-xl text-gray-500"><i class="fas fa-truck text-4xl mb-2"></i><p>Ningún vehículo en ruta</p></div>`;
     } else {
       try {
-        panelEnRuta.innerHTML = enRuta.map(t => `
-          <div class="bg-white rounded-xl shadow-card overflow-hidden border">
-            <div class="p-4">
-              <div class="flex justify-between items-start">
-                <div><h3 class="font-mono font-bold">${escapeHtml(t.patente)}</h3><p class="text-gray-500 text-sm">${escapeHtml(t.motivo)}</p></div>
-                <span class="badge-warning text-xs px-2 py-1 rounded-full">En ruta</span>
+        panelEnRuta.innerHTML = enRuta.map(t => {
+          const patente = t.patente || '?';
+          const motivo = t.motivo || '';
+          const conductor = t.conductor || '';
+          const agenteSalida = t.agente_salida || '';
+          const salida = t.salida;
+          const kmSalida = t.km_salida;
+          const checklist = t.checklist_salida || {};
+          const obs = t.obs_salida || '';
+          return `
+            <div class="bg-white rounded-xl shadow-card overflow-hidden border">
+              <div class="p-4">
+                <div class="flex justify-between items-start">
+                  <div><h3 class="font-mono font-bold">${escapeHtml(patente)}</h3><p class="text-gray-500 text-sm">${escapeHtml(motivo)}</p></div>
+                  <span class="badge-warning text-xs px-2 py-1 rounded-full">En ruta</span>
+                </div>
+                <div class="mt-3 space-y-1 text-sm">
+                  <div><i class="fas fa-user"></i> Conductor: ${escapeHtml(conductor)}</div>
+                  <div><i class="fas fa-shield-alt"></i> Agente: ${escapeHtml(agenteSalida)}</div>
+                  <div><i class="far fa-clock"></i> Salida: ${formatDateTime(salida)}</div>
+                  <div><i class="fas fa-tachometer-alt"></i> Km salida: ${formatearKm(kmSalida)}</div>
+                </div>
+                <div class="mt-2 flex flex-wrap gap-1">${renderChecklistBadges(checklist)}</div>
+                ${obs ? `<p class="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-2">${escapeHtml(obs)}</p>` : ''}
+                <button class="btn-finalizar mt-3 w-full bg-blue-50 text-blue-700 py-2 rounded-lg text-sm font-medium hover:bg-blue-100 transition"
+                  data-id="${t.id}" data-patente="${escapeHtml(patente)}" data-conductor="${escapeHtml(conductor)}" data-km="${kmSalida}">
+                  <i class="fas fa-check-circle"></i> Finalizar y registrar llegada
+                </button>
               </div>
-              <div class="mt-3 space-y-1 text-sm">
-                <div><i class="fas fa-user"></i> Conductor: ${escapeHtml(t.conductor)}</div>
-                <div><i class="fas fa-shield-alt"></i> Agente: ${escapeHtml(t.agente_salida)}</div>
-                <div><i class="far fa-clock"></i> Salida: ${formatDateTime(t.salida)}</div>
-                <div><i class="fas fa-tachometer-alt"></i> Km salida: ${formatearKm(t.km_salida)}</div>
-              </div>
-              <div class="mt-2 flex flex-wrap gap-1">${renderChecklistBadges(t.checklist_salida)}</div>
-              ${t.obs_salida ? `<p class="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-2">${escapeHtml(t.obs_salida)}</p>` : ''}
-              <button class="btn-finalizar mt-3 w-full bg-blue-50 text-blue-700 py-2 rounded-lg text-sm font-medium hover:bg-blue-100 transition"
-                data-id="${t.id}" data-patente="${escapeHtml(t.patente)}" data-conductor="${escapeHtml(t.conductor)}" data-km="${t.km_salida}">
-                <i class="fas fa-check-circle"></i> Finalizar y registrar llegada
-              </button>
             </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch(e) {
         console.error("Error renderizando en ruta:", e);
         panelEnRuta.innerHTML = `<div class="text-red-500 p-4">Error al mostrar viajes: ${e.message}</div>`;
@@ -127,7 +180,6 @@ async function updateUI() {
     }
   }
   
-  // Panel historial (igual pero simplificado)
   const panelHistorial = document.getElementById("panelHistorial");
   if (panelHistorial) {
     if (!completados.length) {
@@ -136,11 +188,242 @@ async function updateUI() {
       panelHistorial.innerHTML = `<div class="bg-white rounded-xl shadow-card overflow-x-auto">
         <table class="min-w-full text-sm"><thead class="bg-gray-50 border-b"><tr><th class="px-4 py-2 text-left">Placa</th><th class="px-4 py-2 text-left">Conductor</th><th class="px-4 py-2 text-left">Motivo</th><th class="px-4 py-2 text-left">Salida</th><th class="px-4 py-2 text-left">Llegada</th><th class="px-4 py-2 text-right">Km</th><th class="px-4 py-2 text-right">Duración</th></tr></thead><tbody>
         ${completados.map(t => `<tr class="border-b hover:bg-gray-50"><td class="px-4 py-2 font-mono">${escapeHtml(t.patente)}</td><td class="px-4 py-2">${escapeHtml(t.conductor)}</td><td class="px-4 py-2">${escapeHtml(t.motivo)}</td><td class="px-4 py-2 text-xs">${formatDateTime(t.salida)}</td><td class="px-4 py-2 text-xs">${formatDateTime(t.llegada)}</td><td class="px-4 py-2 text-right">${((t.km_llegada||0)-t.km_salida).toLocaleString('es-ES')} km</td><td class="px-4 py-2 text-right text-gray-500">${durationBetween(t.salida, t.llegada)}</td></tr>`).join('')}
-        </tbody></table></div>`;
+        </tbody>}</div>`;
     }
   }
 }
 
-// ========== RESTO DE FUNCIONES (tabla vehículos, tesorería, etc.) ==========
-// ... (el resto de tu código de ui.js sin cambios, desde renderTablaVehiculos hasta el final)
-// Asegúrate de incluir también renderTablaVehiculos, cargarGastosPeaje, etc.
+// ========== FUNCIONES PARA TABLA DE VEHÍCULOS ==========
+function renderTablaVehiculos(filtro = '') {
+  const tbody = document.getElementById("tablaVehiculos");
+  if (!tbody) return;
+  if (!window.vehicles) window.vehicles = [];
+  let vehiculosFiltrados = window.vehicles;
+  if (filtro) {
+    const f = filtro.toLowerCase();
+    vehiculosFiltrados = window.vehicles.filter(v => 
+      v.placa.toLowerCase().includes(f) || 
+      (v.marca && v.marca.toLowerCase().includes(f)) || 
+      (v.modelo && v.modelo.toLowerCase().includes(f))
+    );
+  }
+  const vehiculosCount = document.getElementById("vehiculosCount");
+  if (vehiculosCount) vehiculosCount.innerText = vehiculosFiltrados.length;
+  
+  if (vehiculosFiltrados.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">No hay vehículos registrados</td></tr>';
+    return;
+  }
+  
+  const formatFecha = (f) => f ? new Date(f).toLocaleDateString('es-ES') : '-';
+  const alertaClase = (f) => {
+    if (!f) return '';
+    const d = new Date(f);
+    if (isNaN(d.getTime())) return '';
+    const dias = Math.ceil((d - new Date()) / (1000*60*60*24));
+    if (dias < 0) return 'bg-red-100 text-red-700 font-semibold';
+    if (dias < 30) return 'bg-yellow-100 text-yellow-700';
+    return '';
+  };
+  
+  tbody.innerHTML = vehiculosFiltrados.map(v => `
+    <tr class="border-b hover:bg-gray-50">
+      <td class="px-4 py-2 font-mono">${escapeHtml(v.placa)}</td>
+      <td class="px-4 py-2">${escapeHtml(v.marca || '')} ${escapeHtml(v.modelo || '')}</td>
+      <td class="px-4 py-2 text-right">${formatearKm(v.km_actual)}</td>
+      <td class="px-4 py-2 ${alertaClase(v.vencimiento_soat)}">${formatFecha(v.vencimiento_soat)}</td>
+      <td class="px-4 py-2 ${alertaClase(v.vencimiento_revision)}">${formatFecha(v.vencimiento_revision)}</td>
+      <td class="px-4 py-2 ${alertaClase(v.vencimiento_seguro)}">${formatFecha(v.vencimiento_seguro)}</td>
+      <td class="px-4 py-2 ${alertaClase(v.vencimiento_gps)}">${formatFecha(v.vencimiento_gps)}</td>
+      <td class="px-4 py-2">${v.vencimiento_lunas || '-'}</td>
+      <td class="px-4 py-2 text-center">
+        <button class="editar-vencimientos bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs" data-placa="${v.placa}">📅 Actualizar vencimientos</button>
+      </td>
+    </tr>
+  `).join('');
+  
+  document.querySelectorAll('.editar-vencimientos').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const placa = btn.dataset.placa;
+      const vehiculo = window.vehicles.find(v => v.placa === placa);
+      if (vehiculo) abrirModalVencimientos(vehiculo);
+    });
+  });
+}
+
+function abrirModalVencimientos(vehiculo) {
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.innerText = txt; };
+  setVal("editPlacaOriginal", vehiculo.placa);
+  setText("editPlacaDisplay", vehiculo.placa);
+  setVal("editSoat", vehiculo.vencimiento_soat ? vehiculo.vencimiento_soat.split('T')[0] : '');
+  setVal("editGps", vehiculo.vencimiento_gps ? vehiculo.vencimiento_gps.split('T')[0] : '');
+  setVal("editSeguro", vehiculo.vencimiento_seguro ? vehiculo.vencimiento_seguro.split('T')[0] : '');
+  setVal("editRevision", vehiculo.vencimiento_revision ? vehiculo.vencimiento_revision.split('T')[0] : '');
+  setVal("editLunas", vehiculo.vencimiento_lunas || '');
+  const modal = document.getElementById("modalEditarVencimientos");
+  if (modal) modal.classList.remove("hidden");
+}
+
+// ========== FUNCIONES PARA TESORERÍA (GASTOS DE PEAJE Y SALDOS) ==========
+async function cargarGastosPeaje() {
+  const { data, error } = await supabaseClient
+    .from('trip_expenses')
+    .select(`
+      id,
+      monto,
+      factura_url,
+      proveedor,
+      created_at,
+      trips (patente)
+    `)
+    .eq('tipo', 'peaje')
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return data;
+}
+
+function renderTablaPeajes(gastos) {
+  const tbody = document.getElementById("tablaPeajes");
+  if (!tbody) return;
+  if (!gastos || gastos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">No hay gastos de peaje</td></tr>';
+    return;
+  }
+  tbody.innerHTML = gastos.map(g => `
+    <tr class="border-b hover:bg-gray-50">
+      <td class="px-4 py-2">${formatDateTime(g.created_at)}</td>
+      <td class="px-4 py-2 font-mono">${g.trips?.patente || '—'}</td>
+      <td class="px-4 py-2">${g.proveedor || '—'}</td>
+      <td class="px-4 py-2 text-right">S/ ${g.monto.toFixed(2)}</td>
+      <td class="px-4 py-2">${g.factura_url ? `<a href="${g.factura_url}" target="_blank" class="text-blue-500 underline">Ver PDF</a>` : '—'}</td>
+      <td class="px-4 py-2"><span class="px-2 py-1 rounded-full text-xs bg-gray-100">Registrado</span></td>
+    </tr>
+  `).join('');
+}
+
+async function cargarSaldosPeaje() {
+  const { data, error } = await supabaseClient
+    .from('vehiculo_saldo_peaje')
+    .select(`
+      placa,
+      saldo,
+      vehicles (marca, modelo)
+    `)
+    .order('placa');
+  if (error) return [];
+  return data;
+}
+
+function renderTablaSaldosPeaje(saldos) {
+  const tbody = document.getElementById("tablaSaldosPeaje");
+  if (!tbody) return;
+  if (!saldos || saldos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">No hay datos de saldo</td></tr>';
+    return;
+  }
+  tbody.innerHTML = saldos.map(s => `
+    <tr class="border-b hover:bg-gray-50">
+      <td class="px-4 py-2 font-mono">${escapeHtml(s.placa)}</td>
+      <td class="px-4 py-2">${escapeHtml(s.vehicles?.marca || '')} ${escapeHtml(s.vehicles?.modelo || '')}</td>
+      <td class="px-4 py-2 text-right font-bold ${(s.saldo || 0) < 30 ? 'text-red-600' : 'text-green-600'}">S/ ${(s.saldo || 0).toFixed(2)}</td>
+      <td class="px-4 py-2 text-center">
+        <button class="recargar-vehiculo bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs" data-placa="${s.placa}">➕ Recargar</button>
+      </td>
+    </tr>
+  `).join('');
+
+  document.querySelectorAll('.recargar-vehiculo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const placa = btn.dataset.placa;
+      mostrarModalRecarga(placa);
+    });
+  });
+}
+
+function mostrarModalRecarga(placa) {
+  const recargaPlaca = document.getElementById("recargaPlaca");
+  if (recargaPlaca) recargaPlaca.value = placa;
+  const recargaPlacaDisplay = document.getElementById("recargaPlacaDisplay");
+  if (recargaPlacaDisplay) recargaPlacaDisplay.value = placa;
+  const modal = document.getElementById("modalRecarga");
+  if (modal) modal.classList.remove("hidden");
+}
+
+// ========== FUNCIONES DE TESORERÍA (OPERACIONES CON BD) ==========
+if (typeof window.obtenerSaldoPeaje === 'undefined') {
+  async function obtenerSaldoPeaje(placa) {
+    const { data, error } = await supabaseClient
+      .from('vehiculo_saldo_peaje')
+      .select('saldo')
+      .eq('placa', placa)
+      .single();
+    if (error) return 0;
+    return data?.saldo || 0;
+  }
+  window.obtenerSaldoPeaje = obtenerSaldoPeaje;
+}
+
+if (typeof window.recargarSaldoPeaje === 'undefined') {
+  async function recargarSaldoPeaje(placa, monto) {
+    const { data: current } = await supabaseClient
+      .from('vehiculo_saldo_peaje')
+      .select('saldo')
+      .eq('placa', placa)
+      .single();
+    const nuevoSaldo = (current?.saldo || 0) + monto;
+    const { error } = await supabaseClient
+      .from('vehiculo_saldo_peaje')
+      .update({ saldo: nuevoSaldo, ultima_actualizacion: new Date().toISOString() })
+      .eq('placa', placa);
+    return !error;
+  }
+  window.recargarSaldoPeaje = recargarSaldoPeaje;
+}
+
+if (typeof window.descontarSaldoPeaje === 'undefined') {
+  async function descontarSaldoPeaje(placa, monto) {
+    const { data: current } = await supabaseClient
+      .from('vehiculo_saldo_peaje')
+      .select('saldo')
+      .eq('placa', placa)
+      .single();
+    const nuevoSaldo = (current?.saldo || 0) - monto;
+    const { error } = await supabaseClient
+      .from('vehiculo_saldo_peaje')
+      .update({ saldo: nuevoSaldo, ultima_actualizacion: new Date().toISOString() })
+      .eq('placa', placa);
+    return !error;
+  }
+  window.descontarSaldoPeaje = descontarSaldoPeaje;
+}
+
+if (typeof window.obtenerTodosLosSaldosPeaje === 'undefined') {
+  async function obtenerTodosLosSaldosPeaje() {
+    const { data, error } = await supabaseClient
+      .from('vehiculo_saldo_peaje')
+      .select(`
+        placa,
+        saldo,
+        vehicles (marca, modelo)
+      `)
+      .order('placa');
+    if (error) return [];
+    return data;
+  }
+  window.obtenerTodosLosSaldosPeaje = obtenerTodosLosSaldosPeaje;
+}
+
+// ========== EXPOSICIÓN GLOBAL DE FUNCIONES NECESARIAS ==========
+window.renderChecklistGrid = renderChecklistGrid;
+window.mostrarInfoVehiculo = mostrarInfoVehiculo;
+window.updateUI = updateUI;
+window.renderTablaVehiculos = renderTablaVehiculos;
+window.cargarGastosPeaje = cargarGastosPeaje;
+window.renderTablaPeajes = renderTablaPeajes;
+window.cargarSaldosPeaje = cargarSaldosPeaje;
+window.renderTablaSaldosPeaje = renderTablaSaldosPeaje;
+window.mostrarModalRecarga = mostrarModalRecarga;
