@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Control de Flota - Supabase</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Estilos personalizados -->
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Ajustes responsivos adicionales */
+    @media (max-width: 640px) {
+      .checklist-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .stat-card {
+        padding: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body class="font-sans antialiased">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+  <!-- Header responsivo -->
+  <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 sm:mb-8 border-b border-gray-200 pb-4">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 sm:h-11 sm:w-11 rounded-xl gradient-primary flex items-center justify-center shadow-md">
+        <i class="fas fa-truck text-white text-lg sm:text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-lg sm:text-xl font-bold text-gray-800">Control de Flota</h1>
+        <p class="text-xs text-gray-500">Conectado a Supabase</p>
+      </div>
+    </div>
+    <div class="flex justify-center">
+      <img src="img/Grupo-Aurica-ll-azul.png" alt="Logo Grupo Aurica" class="h-10 sm:h-12 w-auto">
+    </div>
+    <div>
+      <button id="btnSalida" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg flex items-center gap-2 shadow transition text-sm sm:text-base">
+        <i class="fas fa-plus"></i> Registrar salida
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Cards responsivas - 3 tarjetas -->
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
+  <div class="stat-card rounded-xl p-3 sm:p-4 flex flex-col items-center text-center shadow-card bg-white">
+    <p class="text-xs text-gray-500">En ruta</p>
+    <p id="statEnRuta" class="text-xl sm:text-2xl font-semibold">0</p>
+    <div class="h-8 w-8 sm:h-9 sm:w-9 gradient-primary rounded-lg flex items-center justify-center mt-2">
+      <i class="fas fa-clock text-white text-sm sm:text-base"></i>
+    </div>
+  </div>
+  <div class="stat-card rounded-xl p-3 sm:p-4 flex flex-col items-center text-center shadow-card bg-white">
+    <p class="text-xs text-gray-500">Llegadas hoy</p>
+    <p id="statHoy" class="text-xl sm:text-2xl font-semibold">0</p>
+    <div class="h-8 w-8 sm:h-9 sm:w-9 bg-gray-100 rounded-lg flex items-center justify-center mt-2">
+      <i class="fas fa-check-circle text-gray-500"></i>
+    </div>
+  </div>
+  <div class="stat-card rounded-xl p-3 sm:p-4 flex flex-col items-center text-center shadow-card bg-white">
+    <p class="text-xs text-gray-500">Total registros</p>
+    <p id="statTotal" class="text-xl sm:text-2xl font-semibold">0</p>
+    <div class="h-8 w-8 sm:h-9 sm:w-9 bg-gray-100 rounded-lg flex items-center justify-center mt-2">
+      <i class="fas fa-file-alt text-gray-500"></i>
+    </div>
+  </div>
+</div>
+  <!-- Tabs responsivos -->
+  <div class="mb-6 border-b border-gray-200 overflow-x-auto">
+    <div class="flex gap-4 whitespace-nowrap">
+      <button id="tabEnRutaBtn" class="py-2 px-1 font-medium text-blue-600 border-b-2 border-blue-600">En ruta (<span id="enRutaCount">0</span>)</button>
+      <button id="tabHistorialBtn" class="py-2 px-1 font-medium text-gray-500 border-b-2 border-transparent">Historial (<span id="historialCount">0</span>)</button>
+      <button id="tabVehiculosBtn" class="py-2 px-1 font-medium text-gray-500 border-b-2 border-transparent">Vehículos (<span id="vehiculosCount">0</span>)</button>
+      <button id="tabTesoreriaBtn" class="py-2 px-1 font-medium text-gray-500 border-b-2 border-transparent">Tesorería</button>
+    </div>
+  </div>
+
+  <!-- Paneles -->
+  <div id="panelEnRuta" class="grid gap-4 sm:grid-cols-2"></div>
+  <div id="panelHistorial" class="hidden overflow-x-auto"></div>
+  <div id="panelVehiculos" class="hidden">
+    <div class="mb-4 flex flex-col sm:flex-row gap-2 justify-between items-center">
+      <input type="text" id="buscadorVehiculos" placeholder="🔍 Buscar por placa, marca o modelo..." class="border rounded p-2 w-full sm:w-64">
+      <button id="btnActualizarVehiculos" class="bg-gray-500 text-white px-3 py-1 rounded text-sm w-full sm:w-auto">⟳ Actualizar</button>
+    </div>
+    <div class="overflow-x-auto bg-white rounded-xl shadow-card">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b">
+          <tr><th class="px-2 py-2 text-left">Placa</th><th class="px-2 py-2 text-left">Marca/Modelo</th><th class="px-2 py-2 text-right">Km actual</th><th class="px-2 py-2 text-left">SOAT</th><th class="px-2 py-2 text-left">Revisión</th><th class="px-2 py-2 text-left">Seguro</th><th class="px-2 py-2 text-left">GPS</th><th class="px-2 py-2 text-left">Lunas</th><th class="px-2 py-2 text-center">Acciones</th></tr></thead>
+        <tbody id="tablaVehiculos"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="panelTesoreria" class="hidden">
+  <div class="mb-4 flex flex-col sm:flex-row gap-2 justify-between items-center">
+    <h3 class="text-lg font-semibold">Saldo de peaje por vehículo</h3>
+    <button id="btnActualizarSaldos" class="bg-gray-500 text-white px-3 py-1 rounded text-sm">⟳ Actualizar</button>
+  </div>
+  <div class="overflow-x-auto bg-white rounded-xl shadow-card">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 border-b">
+        <tr>
+          <th class="px-4 py-2 text-left">Placa</th>
+          <th class="px-4 py-2 text-left">Marca/Modelo</th>
+          <th class="px-4 py-2 text-right">Saldo (S/)</th>
+          <th class="px-4 py-2 text-center">Acción</th>
+        </tr>
+      </thead>
+      <tbody id="tablaSaldosPeaje"></tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- MODALES -->
+<!-- MODAL SALIDA -->
+<div id="modalSalida" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div class="p-4 sm:p-6">
+      <h2 class="text-xl font-bold mb-2">Registrar salida</h2>
+      <form id="formSalida">
+        <div class="grid grid-cols-1 gap-4 mb-4">
+          <div><label class="block text-sm font-medium">Placa *</label>
+            <input list="placasList" id="sPatente" class="w-full border rounded p-2" placeholder="Escribe o selecciona una placa..." required>
+            <datalist id="placasList"></datalist>
+          </div>
+          <div id="vehiculoInfo" class="p-3 bg-gray-50 rounded-lg text-sm hidden">
+            <div class="grid grid-cols-2 gap-2">
+              <p><strong>Marca/Modelo:</strong> <span id="vehMarcaModelo">-</span></p>
+              <p><strong>Año:</strong> <span id="vehAnio">-</span></p>
+              <p><strong>Km actual:</strong> <span id="vehKmActual">-</span> km</p>
+              <p><strong>SOAT:</strong> <span id="vehSoat">-</span> <span id="alertSoat" class="text-red-500"></span></p>
+              <p><strong>Revisión técnica:</strong> <span id="vehRevision">-</span> <span id="alertRevision" class="text-red-500"></span></p>
+              <p><strong>Seguro:</strong> <span id="vehSeguro">-</span> <span id="alertSeguro" class="text-red-500"></span></p>
+              <p><strong>GPS:</strong> <span id="vehGps">-</span> <span id="alertGps" class="text-red-500"></span></p>
+              <p><strong>Lunas:</strong> <span id="vehLunas">-</span> <span id="alertLunas" class="text-red-500"></span></p>
+              <p><strong>Frec. mantenimiento:</strong> <span id="vehFrecMant">-</span></p>
+            </div>
+          </div>
+          <div><label class="block text-sm font-medium">Agente de seguridad *</label><input id="sAgente" type="text" class="w-full border rounded p-2" required></div>
+          <div><label class="block text-sm font-medium">Conductor *</label><input id="sConductor" type="text" class="w-full border rounded p-2" required></div>
+          <div><label class="block text-sm font-medium">Km salida *</label><input id="sKm" type="text" class="w-full border rounded p-2 bg-gray-100" placeholder="Ej: 45.832" readonly required></div>
+          <div><label class="block text-sm font-medium">Motivo *</label><input id="sMotivo" type="text" class="w-full border rounded p-2" required></div>
+          <div><label class="block text-sm font-medium">Observaciones</label><textarea id="sObs" rows="2" class="w-full border rounded p-2"></textarea></div>
+        </div>
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2"><span class="font-medium">Checklist de salida</span><span id="checkSalidaCount" class="text-xs text-gray-500">0/12</span></div>
+          <div id="checklistSalidaGrid" class="checklist-grid"></div>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button type="button" id="closeSalidaBtn" class="px-4 py-2 border rounded">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Confirmar salida</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LLEGADA -->
+<div id="modalLlegada" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div class="p-4 sm:p-6">
+      <h2 class="text-xl font-bold mb-2">Registrar llegada</h2>
+      <form id="formLlegada">
+        <input type="hidden" id="lTripId">
+        <div class="mb-3"><label class="block text-sm font-medium">Placa</label><input id="lPatente" type="text" class="w-full border rounded p-2 bg-gray-100" disabled></div>
+        <div class="mb-3"><label class="block text-sm font-medium">Conductor</label><input id="lConductor" type="text" class="w-full border rounded p-2 bg-gray-100" disabled></div>
+        <div class="mb-3"><label class="block text-sm font-medium">Agente de seguridad *</label><input id="lAgente" type="text" class="w-full border rounded p-2" required></div>
+        <div class="mb-3"><label class="block text-sm font-medium">Km llegada *</label><input id="lKm" type="text" class="w-full border rounded p-2" placeholder="Ej: 46.200" required></div>
+        <div class="mb-3"><label class="block text-sm font-medium">Observaciones</label><textarea id="lObs" rows="2" class="w-full border rounded p-2"></textarea></div>
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2"><span class="font-medium">Checklist de llegada</span><span id="checkLlegadaCount" class="text-xs text-gray-500">0/12</span></div>
+          <div id="checklistLlegadaGrid" class="checklist-grid"></div>
+        </div>
+        <!-- Sección de gastos -->
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-sm font-medium">Gastos adicionales</label>
+            <span id="totalGastosLabel" class="text-xs font-semibold bg-gray-100 px-2 py-1 rounded-full">Total: S/ 0.00</span>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <button type="button" id="btnAddGasolina" class="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition"><i class="fas fa-gas-pump"></i> Gasolina</button>
+            <button type="button" id="btnAddPeaje" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition"><i class="fas fa-toll"></i> Peaje</button>
+            <button type="button" id="btnAddMantenimiento" class="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition"><i class="fas fa-wrench"></i> Mantenimiento</button>
+          </div>
+          <div id="listaGastos" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div class="text-center text-gray-400 text-xs py-2">No hay gastos registrados</div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button type="button" id="closeLlegadaBtn" class="px-4 py-2 border rounded">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Confirmar llegada</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR VENCIMIENTOS -->
+<div id="modalEditarVencimientos" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-white rounded-xl max-w-md w-full p-6">
+    <h2 class="text-xl font-bold mb-2">Actualizar vencimientos</h2>
+    <p class="text-sm text-gray-500 mb-4">Vehículo: <span id="editPlacaDisplay" class="font-mono"></span></p>
+    <form id="formEditarVencimientos">
+      <input type="hidden" id="editPlacaOriginal">
+      <div class="space-y-3">
+        <div><label class="block text-sm font-medium">Vencimiento SOAT</label><input id="editSoat" type="date" class="w-full border rounded p-2"></div>
+        <div><label class="block text-sm font-medium">Vencimiento GPS</label><input id="editGps" type="date" class="w-full border rounded p-2"></div>
+        <div><label class="block text-sm font-medium">Vencimiento Seguro</label><input id="editSeguro" type="date" class="w-full border rounded p-2"></div>
+        <div><label class="block text-sm font-medium">Vencimiento Revisión técnica</label><input id="editRevision" type="date" class="w-full border rounded p-2"></div>
+        <div><label class="block text-sm font-medium">Permiso de lunas</label><select id="editLunas" class="w-full border rounded p-2"><option value="">-- Seleccionar --</option><option value="Sí">Sí</option><option value="No">No</option></select></div>
+      </div>
+      <div class="flex justify-end gap-3 mt-4">
+        <button type="button" id="cancelarEditarBtn" class="px-4 py-2 border rounded">Cancelar</button>
+        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL GASTO -->
+<div id="modalGasto" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-white rounded-xl modal-content max-w-md w-full p-6">
+    <h3 id="gastoTitulo" class="text-lg font-bold mb-4 flex items-center gap-2"><i id="gastoIcono" class="fas fa-receipt text-blue-600"></i><span>Registrar gasto</span></h3>
+    <div id="camposGasto" class="space-y-3"></div>
+    <div class="flex justify-end gap-3 mt-6">
+      <button type="button" id="cancelarGastoBtn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+      <button type="button" id="guardarGastoBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Guardar gasto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RECARGA -->
+<div id="modalRecarga" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-white rounded-xl max-w-md w-full p-6">
+    <h2 class="text-xl font-bold mb-4">Recargar saldo de peajes</h2>
+    <form id="formRecarga">
+      <label class="block text-sm font-medium mb-1">Monto a recargar (S/)</label>
+      <input type="number" id="montoRecarga" step="0.01" min="0.01" class="w-full border rounded-lg p-2 mb-4" required>
+      <div class="flex justify-end gap-3">
+        <button type="button" id="cancelarRecargaBtn" class="px-4 py-2 border rounded">Cancelar</button>
+        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Recargar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index:9999; justify-content: center; align-items: center;">
+  <div class="bg-white p-4 rounded-lg shadow-lg flex items-center gap-3"><i class="fas fa-spinner fa-spin text-blue-600 text-xl"></i><span>Cargando datos...</span></div>
+</div>
+
+<!-- Scripts modulares -->
+<script src="js/config.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/ui.js"></script>        <!-- UI debe cargar ANTES -->
+<script src="js/handlers.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

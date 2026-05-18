@@ -1,0 +1,121 @@
+/* Importar fuente moderna */
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
+
+* {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #f5f7fc 0%, #eef2f6 100%);
+  background-attachment: fixed;
+}
+
+/* Gradiente principal (azul Aurica) */
+.gradient-primary {
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+/* Header con efecto vidrio */
+.glass-header {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* Tarjetas mejoradas */
+.shadow-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.shadow-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.15);
+}
+
+/* Botones con gradiente y efecto */
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+.btn-primary:hover {
+  transform: scale(1.02);
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.4);
+}
+
+/* Badges de checklist */
+.badge-check {
+  background-color: #f0fdf4;
+  color: #166534;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid #bbf7d0;
+}
+
+/* Tablas más elegantes */
+.table-fleet {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+.table-fleet thead th {
+  background-color: #f8fafc;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+}
+.table-fleet tbody tr {
+  transition: background-color 0.15s ease;
+}
+.table-fleet tbody tr:hover {
+  background-color: #f1f5f9;
+}
+
+/* Checklist grid mejorado */
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+.checklist-item {
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  transition: all 0.15s ease;
+  border: 1px solid #e5e7eb;
+}
+.checklist-item:hover {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+/* Modales con fondo borroso */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.4);
+}
+.modal-content {
+  border-radius: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Estadísticas mejoradas */
+.stat-card {
+  background: white;
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+  border: 1px solid #f0f0f0;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.08);
+}
