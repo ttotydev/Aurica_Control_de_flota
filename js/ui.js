@@ -113,11 +113,16 @@ function mostrarInfoVehiculo(placa) {
   if (kmInput && typeof veh.km_actual === 'number') kmInput.value = formatearKm(veh.km_actual);
 }
 
-// ========== FUNCIÓN PRINCIPAL updateUI (autocontenida) ==========
+// ========== FUNCIÓN PRINCIPAL updateUI ==========
 async function updateUI() {
+  console.log("🔄 updateUI() ejecutándose...");
+  console.log("window.trips:", window.trips);
+  
   if (!window.trips) window.trips = [];
   const enRuta = window.trips.filter(t => t.status === "en_ruta");
   const completados = window.trips.filter(t => t.status === "completado").sort((a,b) => (b.llegada||"").localeCompare(a.llegada||""));
+  
+  console.log(`📊 En ruta: ${enRuta.length}, Completados: ${completados.length}`);
   
   const setStat = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
   setStat("statEnRuta", enRuta.length);
@@ -173,11 +178,14 @@ async function updateUI() {
             </div>
           `;
         }).join('');
+        console.log("✅ Panel en ruta renderizado correctamente");
       } catch(e) {
         console.error("Error renderizando en ruta:", e);
         panelEnRuta.innerHTML = `<div class="text-red-500 p-4">Error al mostrar viajes: ${e.message}</div>`;
       }
     }
+  } else {
+    console.error("❌ No se encontró el elemento #panelEnRuta en el DOM");
   }
   
   const panelHistorial = document.getElementById("panelHistorial");
@@ -265,7 +273,7 @@ function abrirModalVencimientos(vehiculo) {
   if (modal) modal.classList.remove("hidden");
 }
 
-// ========== FUNCIONES PARA TESORERÍA (GASTOS DE PEAJE Y SALDOS) ==========
+// ========== FUNCIONES PARA TESORERÍA ==========
 async function cargarGastosPeaje() {
   const { data, error } = await supabaseClient
     .from('trip_expenses')
@@ -417,7 +425,7 @@ if (typeof window.obtenerTodosLosSaldosPeaje === 'undefined') {
   window.obtenerTodosLosSaldosPeaje = obtenerTodosLosSaldosPeaje;
 }
 
-// ========== EXPOSICIÓN GLOBAL DE FUNCIONES NECESARIAS ==========
+// ========== EXPOSICIÓN GLOBAL ==========
 window.renderChecklistGrid = renderChecklistGrid;
 window.mostrarInfoVehiculo = mostrarInfoVehiculo;
 window.updateUI = updateUI;
