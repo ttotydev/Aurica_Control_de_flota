@@ -118,7 +118,6 @@ async function updateUI() {
   const completados = window.trips.filter(t => t.status === "completado").sort((a,b) => (b.llegada||"").localeCompare(a.llegada||""));
   console.log(`📊 En ruta: ${enRuta.length}, Completados: ${completados.length}`);
 
-  // PROTECCIÓN ROBUSTA: Se usa Optional Chaining (?.) para evitar errores si los elementos HTML no existen
   const setStat = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
   setStat("statEnRuta", enRuta.length);
   setStat("enRutaCount", enRuta.length);
